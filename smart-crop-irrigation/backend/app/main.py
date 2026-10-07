@@ -1,84 +1,40 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
+from fastapi.middleware.cors import CORSMiddleware
+from app.routes.prediction import router as prediction_router
+from app.routes.telemetry import router as telemetry_router
+from app.services.ml_service import ml_service
 
 app = FastAPI(title="Smart Crop Irrigation API")
 
-# Schemas
-class SensorReading(BaseModel):
-    timestamp: datetime
-    soil_moisture: float
-    temperature: float
-    humidity: float
-    light: float
-    pump_status: int
+# Setup CORS
+origins = [
+    "http://localhost:5173",
+]
 
-class PredictionRequest(BaseModel):
-    soil_moisture: float
-    temperature: float
-    humidity: float
-    light_intensity: float
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class PredictionResponse(BaseModel):
-    irrigation_required: int  # 0 or 1
-    confidence: float
-    model_used: str
+# Include Routers
+app.include_router(prediction_router)
+app.include_router(telemetry_router)
 
-class IrrigationStatus(BaseModel):
-    current_state: str
-    ml_recommendation: int
-    prediction_confidence: float
-    soil_moisture_threshold: float
-    recent_events: List[dict]
-
-# Endpoints
-
-@app.get("/health")
+@app.get("/api/health")
 def health_check():
-    return {"status": "healthy"}
-
-@app.get("/api/sensors/latest", response_model=SensorReading)
-def get_latest_sensor_data():
-    # TODO: Fetch from actual IoT data layer
-    # Temporary development placeholder
-    return SensorReading(
-        timestamp=datetime.now(),
-        soil_moisture=0.0,
-        temperature=0.0,
-        humidity=0.0,
-        light=0.0,
-        pump_status=0
-    )
-
-@app.get("/api/sensors/history", response_model=List[SensorReading])
-def get_sensor_history():
-    # TODO: Fetch from database
-    return []
-
-@app.post("/api/predict", response_model=PredictionResponse)
-def predict_irrigation(request: PredictionRequest):
-    # TODO: Implement actual ML prediction
-    # Temporary development placeholder
-    return PredictionResponse(
-        irrigation_required=0,
-        confidence=0.0,
-        model_used="none"
-    )
-
-@app.get("/api/irrigation/status", response_model=IrrigationStatus)
-def get_irrigation_status():
-    # TODO: Fetch actual status
-    # Temporary development placeholder
-    return IrrigationStatus(
-        current_state="OFF",
-        ml_recommendation=0,
-        prediction_confidence=0.0,
-        soil_moisture_threshold=30.0,
-        recent_events=[]
-    )
-
-@app.get("/api/analytics")
-def get_analytics():
-    # TODO: Return ML insights and sensor analytics
-    return {"message": "Awaiting ML model"}
+    model_loaded = False
+    try:
+        if ml_service.model is None:
+            ml_service.load_model()
+        model_loaded = ml_service.model is not None
+    except Exception as e:
+        model_loaded = False
+        print(f"Health check model load error: {e}")
+        
+    return {
+        "status": "ok",
+        "model_loaded": model_loaded
+    }
