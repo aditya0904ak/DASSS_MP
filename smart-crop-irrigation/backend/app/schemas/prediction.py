@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, Field
 
 class PredictionRequest(BaseModel):
@@ -11,4 +12,4 @@ class PredictionRequest(BaseModel):
 class PredictionResponse(BaseModel):
     pump_prediction: int
     irrigation_required: bool
-    confidence: float
+    confidence: Optional[float] = None

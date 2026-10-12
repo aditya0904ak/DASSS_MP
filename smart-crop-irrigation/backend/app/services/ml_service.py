@@ -17,8 +17,9 @@ class MLService:
         
     def load_model(self):
         model_path = os.path.join(self.models_dir, 'irrigation_model.pkl')
-        scaler_path = os.path.join(self.models_dir, 'scaler.pkl')
-        features_path = os.path.join(self.models_dir, 'feature_names.pkl')
+        features_path = os.path.join(self.models_dir, 'features.pkl')
+        if not os.path.exists(features_path):
+            features_path = os.path.join(self.models_dir, 'feature_names.pkl')
         
         if not os.path.exists(model_path):
             raise FileNotFoundError("Model file not found. Please train the model first.")
@@ -68,10 +69,20 @@ class MLService:
             
         prediction = int(self.model.predict(X)[0])
         
-        confidence = 1.0 # default if no proba
+        confidence = None
         if hasattr(self.model, 'predict_proba'):
-            proba = self.model.predict_proba(X)[0]
-            confidence = float(proba[1]) if prediction == 1 else float(proba[0])
+            try:
+                proba = self.model.predict_proba(X)[0]
+                if hasattr(self.model, 'classes_'):
+                    classes_list = list(self.model.classes_)
+                    for idx, c in enumerate(classes_list):
+                        if int(c) == prediction:
+                            confidence = round(float(proba[idx]), 4)
+                            break
+                else:
+                    confidence = round(float(proba[prediction]), 4)
+            except Exception:
+                confidence = None
             
         return {
             "pump_prediction": prediction,
